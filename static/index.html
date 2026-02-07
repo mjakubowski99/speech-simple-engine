@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebSocket ASR Client</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 16px; margin-right: 10px; }
+    #log { white-space: pre-wrap; background: #111; color: #0f0; padding: 10px; height: 300px; overflow: auto; }
+  </style>
+</head>
+<body>
+
+<h2>🎤 WebSocket ASR Client</h2>
+
+<button id="start">Start</button>
+<button id="stop">Stop</button>
+
+<div id="log"></div>
+
+<script>
+const WS_URL = "ws://localhost:9000/ws";
+const OUT_SAMPLE_RATE = 16000;  // dla Vosk
+
+let ws;
+let audioContext;
+let processor;
+let stream;
+
+const log = (msg) => {
+  const el = document.getElementById("log");
+  el.textContent += msg + "\n";
+  el.scrollTop = el.scrollHeight;
+};
+
+// Float32 → PCM16
+function floatTo16BitPCM(float32Array) {
+  const buffer = new ArrayBuffer(float32Array.length * 2);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  for (let i = 0; i < float32Array.length; i++, offset += 2) {
+    let sample = Math.max(-1, Math.min(1, float32Array[i]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+  return buffer;
+}
+
+// Resampling do 16kHz
+function downsampleBuffer(buffer, sampleRate, outRate) {
+  if (outRate === sampleRate) return buffer;
+  const sampleRateRatio = sampleRate / outRate;
+  const newLength = Math.round(buffer.length / sampleRateRatio);
+  const result = new Float32Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+    let accum = 0, count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = accum / count;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
+async function start() {
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => log("🟢 WebSocket connected");
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      log(`[${msg.type}] ${msg.text}`);
+    } catch {
+      log("⬇️ " + e.data);
+    }
+  };
+  ws.onclose = () => log("🔴 WebSocket closed");
+
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  audioContext = new AudioContext();  // użyj domyślnego sampleRate
+
+  const source = audioContext.createMediaStreamSource(stream);
+  processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+  processor.onaudioprocess = (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const input = e.inputBuffer.getChannelData(0);
+    const downsampled = downsampleBuffer(input, audioContext.sampleRate, OUT_SAMPLE_RATE);
+    const pcm = floatTo16BitPCM(downsampled);
+    ws.send(pcm);
+  };
+
+  source.connect(processor);
+  processor.connect(audioContext.destination);
+
+  log("🎤 Recording started");
+}
+
+function stop() {
+  if (processor) processor.disconnect();
+  if (audioContext) audioContext.close();
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (ws) ws.close();
+
+  log("⏹️ Recording stopped");
+}
+
+document.getElementById("start").onclick = start;
+document.getElementById("stop").onclick = stop;
+</script>
+
+</body>
+</html>
