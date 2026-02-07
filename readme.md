@@ -39,12 +39,14 @@ pip install -r requirements.txt
 
 ### 5. Download Vosk model
 
+This is a model recognizing english language.
 ```bash
 mkdir -p models/ && cd models/ && \
 wget https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip && \
 unzip vosk-model-en-us-0.22-lgraph.zip && \
 cd ..
 ```
+You can download any model you want from this website: https://alphacephei.com/vosk/models
 
 **Note:** The model will be extracted to `models/vosk-model-en-us-0.22-lgraph/`
 
