@@ -1,14 +1,14 @@
-# 🎤 Speech Engine - Real-time Speech Recognition API
+# Speech Engine - Real-time Speech Recognition API
 
 A FastAPI-based sample web application providing real-time speech-to-text transcription using Vosk speech recognition engine.
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.8 or higher
 - `wget` (for downloading the model)
 - Microphone access (for testing)
 
-## 🚀 Installation
+## Installation
 
 ### 1. Clone the repository
 
@@ -48,7 +48,7 @@ cd ..
 
 **Note:** The model will be extracted to `models/vosk-model-en-us-0.22-lgraph/`
 
-## 🎯 Usage
+## Usage
 
 ### Start the application
 
